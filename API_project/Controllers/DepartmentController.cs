@@ -1,5 +1,6 @@
 ﻿using API_project.Data;
 using API_project.Models;
+using API_project.UnitOfWork;
 using Microsoft.AspNetCore.Mvc;
 using DTO=API_project.Models.DTO;
 
@@ -9,27 +10,38 @@ namespace API_project.Controllers
     [ApiController]
     public class DepartmentController : Controller
     {
-        private readonly OfficeContext _officeContext;
-        public DepartmentController(OfficeContext officeContext)
+        private readonly IUnitOfWork _unitOfWork;
+        public DepartmentController(IUnitOfWork unitOfWork)
         {
-            _officeContext = officeContext;
+            _unitOfWork = unitOfWork;
         }
         //GET
         [HttpGet]
         public IActionResult Department() 
         { 
-            var allDepartment=_officeContext.Departments.OrderBy(x=>x.Id).ToList();
+            var allDepartment=_unitOfWork.Departments.GetAll().OrderBy(x=>x.Id).ToList();
             if (allDepartment == null)
             {
                 return NotFound("Department is null");
             }
             return Ok(allDepartment);
         }
+        //search-by id
+        [HttpGet("by-id/{id}")]
+        public IActionResult getDepartmentByName(int id)
+        {
+            var department = _unitOfWork.Departments.GetById(id);
+            if (department == null)
+            {
+                return NotFound();
+            }
+            return Ok(department);
+        }
         //Search-by name
         [HttpGet("by-name/{Ename}")]
         public IActionResult getDepartmentByName(String Ename)
         {
-            var department = _officeContext.Departments.FirstOrDefault(x => x.Name==Ename);
+            var department = _unitOfWork.Departments.GetAll().FirstOrDefault(x => x.Name==Ename);
             if (department == null)
             {
                 return NotFound();
@@ -49,15 +61,15 @@ namespace API_project.Controllers
                 Id = department.Id,
                 Name = department.Name
             };
-            _officeContext.Add(new_department);
-            _officeContext.SaveChanges();
+            _unitOfWork.Departments.Add(new_department);
+            _unitOfWork.Save();
             return Ok(new_department);
         }
         //UPDATE
-        [HttpPut("{deptName}")]
-        public IActionResult UpdateDept(string deptName, [FromBody] DTO.Departments department)
+        [HttpPut("{id}")]
+        public IActionResult UpdateDept(int id, [FromBody] DTO.Departments department)
         {
-            var updateDept=_officeContext.Departments.FirstOrDefault(x=>x.Name == deptName);
+            var updateDept = _unitOfWork.Departments.GetById(id);
             if (updateDept == null)
             {
                 return BadRequest();
@@ -67,18 +79,19 @@ namespace API_project.Controllers
             {
                 updateDept.Name = department.Name;
             }
+            updateDept.Name = updateDept.Name?? updateDept.Name;
 
-            _officeContext.SaveChanges();
+            _unitOfWork.Save();
             return Ok(updateDept);
         }
 
         //DELETE
-        [HttpDelete("{deptName}")]
-        public IActionResult DeleteDept(string deptName) 
-        { 
-            var dept=_officeContext.Departments.FirstOrDefault(x=>x.Name == deptName);
-            _officeContext.Departments.Remove(dept);
-            _officeContext.SaveChanges();
+        [HttpDelete("{id}")]
+        public IActionResult DeleteDept(int id) 
+        {
+            var dept = _unitOfWork.Departments.GetById(id);
+            _unitOfWork.Departments.Delete(id);
+            _unitOfWork.Save();
             return Ok(dept);
         }
     }

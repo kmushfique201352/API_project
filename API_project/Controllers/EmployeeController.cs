@@ -2,6 +2,7 @@
 using API_project.Models;
 using DTO=API_project.Models.DTO;
 using Microsoft.AspNetCore.Mvc;
+using API_project.UnitOfWork;
 
 namespace API_project.Controllers
 {
@@ -9,28 +10,28 @@ namespace API_project.Controllers
     [ApiController]
     public class EmployeeController : Controller
     {
-        private readonly OfficeContext _officeContext;
-        public EmployeeController(OfficeContext officeContext) 
+        private readonly IUnitOfWork _unitOfWork;
+        public EmployeeController(IUnitOfWork unitOfWork) 
         {
-            _officeContext = officeContext;
+            _unitOfWork = unitOfWork;
         }
 
         //Read
         [HttpGet("get_all_e/")]
         public IActionResult getEmployees() 
         {
-            var allEmployee= _officeContext.Employees.OrderBy(x => x.Id).ToList();
-            if (allEmployee == null) 
-            { 
+            var allEmployees = _unitOfWork.Employees.GetAll().OrderBy(x => x.Id).ToList();
+            if (allEmployees == null)
+            {
                 return NotFound();
             }
-            return Ok(allEmployee);
+            return Ok(allEmployees);
         }
         //Search-by name
         [HttpGet("by-name/{Ename}")]
         public IActionResult getEmployeeByName(string Ename) 
         { 
-            var employee=_officeContext.Employees.FirstOrDefault(x=>x.name==Ename);
+            var employee= _unitOfWork.Employees.GetAll().FirstOrDefault(x=>x.name==Ename);
             if(employee == null)
             {
                 return NotFound();
@@ -42,7 +43,7 @@ namespace API_project.Controllers
         [HttpGet("by-phone/{number}")]
         public IActionResult getEmployeeByPhone(string number)
         {
-            var employee = _officeContext.Employees.FirstOrDefault(a => a.PhoneNumber==number);
+            var employee = _unitOfWork.Employees.GetAll().FirstOrDefault(a => a.PhoneNumber==number);
             if (employee == null)
             {
                 return NotFound();
@@ -53,7 +54,7 @@ namespace API_project.Controllers
         [HttpGet("by-department/{DeptId}")]
         public IActionResult getEmployeeByDept(int DeptId)
         {
-            var employee = _officeContext.Employees.FirstOrDefault(x => x.Deptid == DeptId);
+            var employee = _unitOfWork.Employees.GetAll().FirstOrDefault(x => x.Deptid == DeptId);
             if (employee == null)
             {
                 return NotFound();
@@ -76,8 +77,8 @@ namespace API_project.Controllers
                 PhoneNumber=employee.PhoneNumber,
                 Deptid=employee.Deptid
             };
-            _officeContext.Employees.Add(new_employee);
-            _officeContext.SaveChanges();
+            _unitOfWork.Employees.Add(new_employee);
+            _unitOfWork.Save();
             return Ok(new_employee);
         }
 
@@ -85,26 +86,18 @@ namespace API_project.Controllers
         [HttpPut("update_e/{id}")]
         public IActionResult updateEmployee(int id, [FromBody] DTO.Employee employee)
         {
-            var updatedEmployee=_officeContext.Employees.FirstOrDefault(x=>x.Id==id);
-            if(updatedEmployee == null)
+            var updatedEmployee = _unitOfWork.Employees.GetById(id);
+            if (updatedEmployee == null)
             {
                 return BadRequest("Employee is null");
             }
 
-            if (updatedEmployee.name != null)
-            {
-                updatedEmployee.name = employee.name;
-            }
-            if (updatedEmployee.PhoneNumber != null)
-            {
-                updatedEmployee.PhoneNumber = employee.PhoneNumber;
-            }
-            if (updatedEmployee.Deptid != null)
-            {
-                updatedEmployee.Deptid = employee.Deptid;
-            }
+            updatedEmployee.name = employee.name ?? updatedEmployee.name;
+            updatedEmployee.PhoneNumber = employee.PhoneNumber ?? updatedEmployee.PhoneNumber;
+            updatedEmployee.Deptid = employee.Deptid != 0 ? employee.Deptid : updatedEmployee.Deptid;
 
-            _officeContext.SaveChanges();
+            _unitOfWork.Employees.Update(updatedEmployee);
+            _unitOfWork.Save();
             return Ok(updatedEmployee);
         }
 
@@ -112,10 +105,15 @@ namespace API_project.Controllers
         //Delete
         [HttpDelete("delete_e/{id}")]
         public IActionResult DeleteEmployee(int id) 
-        { 
-            var employee= _officeContext.Employees.FirstOrDefault(x=>x.Id==id);
-            _officeContext.Employees.Remove(employee);
-            _officeContext.SaveChanges();
+        {
+            var employee = _unitOfWork.Employees.GetById(id);
+            if (employee == null)
+            {
+                return NotFound("Employee not found.");
+            }
+
+            _unitOfWork.Employees.Delete(id);
+            _unitOfWork.Save();
             return Ok(employee);
         }
     }
